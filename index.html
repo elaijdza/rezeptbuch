@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rezepte">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#c4552d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Rezepte</title>
+<style>
+:root{--bg:#faf7f2;--card:#fff;--tx:#2a2420;--mu:#7a6f66;--ac:#c4552d;--bd:#e8e0d6;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1917;--card:#292524;--tx:#f5f0ea;--mu:#a8a098;--ac:#e8794f;--bd:#3d3733;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1c1917;--card:#292524;--tx:#f5f0ea;--mu:#a8a098;--ac:#e8794f;--bd:#3d3733;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,system-ui,"Segoe UI",sans-serif;max-width:640px;margin:0 auto;padding:16px 16px 90px}
+h1{font:700 28px Georgia,serif;margin:4px 0 12px}h2{font:700 22px Georgia,serif;margin:8px 0}
+input,textarea,select{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);font:inherit;margin:6px 0}
+button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--ac);color:#fff;font-weight:600}
+button.g{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px}.chips button{white-space:nowrap;padding:8px 14px;border-radius:99px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;margin:10px 0}
+.mu{color:var(--mu);font-size:14px}.tag{display:inline-block;background:var(--bd);border-radius:99px;padding:2px 10px;font-size:13px}
+.fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:50%;font-size:30px;padding:0;box-shadow:0 4px 14px #0004}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
+.step{display:flex;gap:10px;margin:10px 0}.step b{color:var(--ac)}
+.st{display:flex;align-items:center;gap:14px;justify-content:center}.st button{width:44px;padding:8px;font-size:22px}
+li{padding:7px 0;border-bottom:1px solid var(--bd);list-style:none}ul{padding:0;margin:0}
+.err{color:#c0392b}
+.ir{display:flex;gap:6px;align-items:center}.ir input.a{flex:0 0 22%}.ir input.u{flex:0 0 20%}.ir input.nm{flex:1;min-width:0}.ir textarea{flex:1}.ir button{padding:10px 12px;flex:0 0 auto}
+</style></head><body>
+<div id="app"></div>
+<script>
+const CATS=["Frühstück","Vorspeise","Suppe","Salat","Hauptgericht","Beilage","Dessert","Backen","Snack","Getränk"];
+let R=[];try{R=JSON.parse(localStorage.getItem("rb")||"[]")}catch(e){}
+let V="list",cat="Alle",q="",cur=null,pers=4,tab="foto",busy="",msg="",note="",ed=null;
+const $=s=>document.getElementById(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function save(){try{localStorage.setItem("rb",JSON.stringify(R))}catch(e){}}
+function fmt(a,u){if(a==null||isNaN(a))return"";u=u||"";let x=a;
+ if(u==="g"&&x>=1000){x/=1000;u="kg"}if(u==="ml"&&x>=1000){x/=1000;u="l"}
+ let s;const metric=["g","kg","ml","l"].includes(u);
+ if(metric){s=u==="g"&&x>=50?Math.round(x/5)*5:x>=10?Math.round(x):Math.round(x*10)/10}
+ else{const w=Math.floor(x),f=x-w,F=[[0,""],[.25,"¼"],[.33,"⅓"],[.5,"½"],[.67,"⅔"],[.75,"¾"],[1,"+"]];
+  let b=F.reduce((p,c)=>Math.abs(c[0]-f)<Math.abs(p[0]-f)?c:p);
+  s=Math.abs(b[0]-f)<.05&&x<20?(b[1]==="+"?String(w+1):(w?w+" ":"")+b[1]||String(w)):String(Math.round(x*10)/10)}
+ return String(s).replace(".",",")+(u?" "+u:"")}
+function render(){const a=$("app");
+ if(V==="list"){const L=R.filter(r=>(cat==="Alle"||r.category===cat)&&(r.title+" "+r.ingredients.map(i=>i.name).join(" ")).toLowerCase().includes(q.toLowerCase()));
+  const used=["Alle",...CATS.filter(c=>R.some(r=>r.category===c))];
+  a.innerHTML=`<h1>📖 Rezeptbuch</h1><input id="q" type="search" placeholder="Suchen (Titel, Zutat)…" value="${esc(q)}" oninput="q=this.value;render();$('q').focus()">
+  <div class="chips">${used.map(c=>`<button class="${c===cat?"":"g"}" onclick="cat='${c}';render()">${c}</button>`).join("")}</div>
+  ${L.length?L.map(r=>`<div class="card" onclick="open_('${r.id}')"><b>${esc(r.title)}</b><div class="mu">${r.ingredients.length} Zutaten · ${r.servings} Pers.</div><span class="tag">${esc(r.category)}</span></div>`).join(""):`<p class="mu">${R.length?"Keine Treffer.":"Noch keine Rezepte. Tippe auf + und füge dein erstes Rezept hinzu."}</p>`}
+  <div class="row" style="margin-top:24px"><button class="g" onclick="exp()">⬇︎ Sichern</button><button class="g" onclick="$('imp').click()">⬆︎ Wiederherstellen</button></div><input id="imp" type="file" accept=".json,application/json" hidden onchange="imp(this.files[0])"><p class="mu">${esc(note)}</p>
+  <button class="fab" onclick="V='add';msg='';render()">+</button>`}
+ else if(V==="detail"){const r=R.find(x=>x.id===cur);if(!r){V="list";return render()}const k=pers/r.servings;
+  a.innerHTML=`<button class="g" onclick="V='list';render()">← Zurück</button><h2>${esc(r.title)}</h2>
+  <select onchange="setCat(this.value)">${CATS.map(c=>`<option ${c===r.category?"selected":""}>${c}</option>`).join("")}</select>
+  <div class="card"><div class="mu" style="text-align:center">Personen (Original: ${r.servings})</div>
+  <div class="st"><button onclick="pers=Math.max(1,pers-1);render()">−</button><b style="font-size:28px">${pers}</b><button onclick="pers++;render()">+</button></div></div>
+  <h3>Zutaten</h3><ul>${r.ingredients.map(i=>`<li><b>${fmt(i.amount==null?null:i.amount*k,i.unit)}</b> ${esc(i.name)}</li>`).join("")}</ul>
+  <h3>Zubereitung</h3>${r.steps.map((s,i)=>`<div class="step"><b>${i+1}.</b><span>${esc(s)}</span></div>`).join("")}
+  ${r.source?`<p class="mu">Quelle: ${esc(r.source)}</p>`:""}
+  <div class="row" style="margin:16px 0"><button onclick="startEd()">✎ Bearbeiten</button><button class="g" onclick="del('${r.id}')">Löschen</button></div>`}
+ else if(V==="edit"){a.innerHTML=`<button class="g" onclick="cancelEd()">← Abbrechen</button><h2>${ed._new?"Erkanntes Rezept prüfen":"Rezept bearbeiten"}</h2>${ed._new?'<p class="mu">Bitte Zutaten und Schritte kurz prüfen und bei Bedarf korrigieren.</p>':""}
+  <input value="${esc(ed.title)}" placeholder="Titel" oninput="ed.title=this.value">
+  <select onchange="ed.category=this.value">${CATS.map(c=>`<option ${c===ed.category?"selected":""}>${c}</option>`).join("")}</select>
+  <div class="mu">Portionen im Rezept</div><input type="number" min="1" inputmode="numeric" value="${esc(ed.servings)}" oninput="ed.servings=this.value">
+  <h3>Zutaten</h3>${ed.ingredients.map((i,n)=>`<div class="ir"><input class="a" inputmode="decimal" placeholder="Menge" value="${i.amount===null||i.amount===""?"":esc(String(i.amount).replace(".",","))}" oninput="ed.ingredients[${n}].amount=this.value"><input class="u" placeholder="Einheit" value="${esc(i.unit)}" oninput="ed.ingredients[${n}].unit=this.value"><input class="nm" placeholder="Zutat" value="${esc(i.name)}" oninput="ed.ingredients[${n}].name=this.value"><button class="g" onclick="ed.ingredients.splice(${n},1);render()">✕</button></div>`).join("")}
+  <button class="g" onclick="ed.ingredients.push({amount:'',unit:'',name:''});render()">+ Zutat</button>
+  <h3>Zubereitung</h3>${ed.steps.map((s,n)=>`<div class="ir"><textarea rows="3" oninput="ed.steps[${n}]=this.value">${esc(s)}</textarea><button class="g" onclick="ed.steps.splice(${n},1);render()">✕</button></div>`).join("")}
+  <button class="g" onclick="ed.steps.push('');render()">+ Schritt</button>
+  <p><button style="width:100%" onclick="saveEd()">Speichern</button></p>`}
+ else{a.innerHTML=`<button class="g" onclick="V='list';render()">← Zurück</button><h2>Rezept hinzufügen</h2>
+  <div class="row"><button class="${tab==="foto"?"":"g"}" onclick="tab='foto';render()">📷 Foto</button><button class="${tab==="link"?"":"g"}" onclick="tab='link';render()">🔗 Link / Text</button></div>
+  ${tab==="foto"?`<div class="card"><p class="mu">Fotografiere eine Rezeptseite oder einen Screenshot. Der Text wird auf deinem Gerät erkannt (beim ersten Mal wird ein Sprachpaket geladen) und danach zur Kontrolle angezeigt. Tipp: Das iPhone erkennt Text in Fotos auch selbst: Text antippen und halten, Kopieren, dann unter «Link / Text» einfügen.</p><input id="f" type="file" accept="image/*"><button onclick="goFoto()" ${busy?"disabled":""}>Rezept erkennen</button></div>`
+  :`<div class="card"><input id="u" type="url" placeholder="https://… (Link zum Rezept)"><textarea id="t" rows="7" placeholder="Rezepttext einfügen (mit Zeilen «Zutaten» und «Zubereitung»)"></textarea><button onclick="goLink()" ${busy?"disabled":""}>Rezept importieren</button></div>`}
+  <p class="${msg.startsWith("!")?"err":"mu"}">${busy||esc(msg.replace(/^!/,""))}</p>`}}
+function open_(id){cur=id;pers=R.find(x=>x.id===id).servings;V="detail";scrollTo(0,0);render()}
+function setCat(c){R.find(x=>x.id===cur).category=c;save()}
+function del(id){if(confirm("Rezept wirklich löschen?")){R=R.filter(x=>x.id!==id);save();V="list";render()}}
+const shrink=f=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(1,2000/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=im.width*s;c.height=im.height*s;c.getContext("2d").drawImage(im,0,0,c.width,c.height);c.toBlob(b=>b?res(b):rej(new Error("Bild")),"image/jpeg",.82)};im.onerror=()=>rej(new Error("Bild nicht lesbar"));im.src=fr.result};fr.onerror=rej;fr.readAsDataURL(f)});
+function guess(p){const t=(p.title||"").toLowerCase(),i=(p.ingredients||[]).map(x=>x.name).join(" ").toLowerCase();
+ const T=[["Suppe",/suppe|eintopf|bouillon|brühe/],["Salat",/salat/],["Getränk",/smoothie|cocktail|limonade|punsch|shake|getränk/],["Frühstück",/müesli|müsli|porridge|pancake|pfannkuchen|omelett|frühstück|brunch|rührei|granola/],["Backen",/kuchen|torte|brot|zopf|gebäck|muffin|cookie|guetzli|plätzchen|brötchen|hefe|tarte|kekse/],["Dessert",/dessert|pudding|mousse|tiramisu|panna cotta|\beis\b|creme|crème|parfait|kompott/],["Beilage",/beilage|püree|kartoffelstock|knödel|ofenkartoffel|pommes/],["Snack",/\bdip\b|aufstrich|riegel|chips|snack|hummus/],["Vorspeise",/vorspeise|bruschetta|carpaccio|antipasti/]];
+ for(const[c,r]of T)if(r.test(t))return c;
+ if(/mehl/.test(i)&&/backpulver|hefe|natron/.test(i))return"Backen";return"Hauptgericht"}
+function parseIng(l){l=l.replace(/^[\s\-•*·▢☐]+/,"").trim();if(!l)return null;
+ const m=l.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])(?:\s*[-–]\s*\d+(?:[.,]\d+)?)?\s*(kg|g|ml|dl|cl|l|EL|TL|Stk\.?|Stück|Prisen?|Bund|Dosen?|Pck\.?|Päckchen|Zehen?|Scheiben?)?\.?\s+(.+)$/i);
+ if(!m)return{amount:null,unit:"",name:l};
+ const fr={"½":.5,"¼":.25,"¾":.75,"⅓":.33,"⅔":.67};let a=m[1].trim(),n;const z=a.match(/[½¼¾⅓⅔]/);
+ if(/^\d+\s+\d+\/\d+$/.test(a)){const[w,f]=a.split(/\s+/),[x,y]=f.split("/");n=+w+x/y}
+ else if(/^\d+\/\d+$/.test(a)){const[x,y]=a.split("/");n=x/y}
+ else if(z){n=(parseFloat(a.replace(z[0],"").replace(",","."))||0)+fr[z[0]]}
+ else n=parseFloat(a.replace(",","."));
+ let u=(m[2]||"").replace(/\.$/,"");
+ if(/^dl$/i.test(u)){n*=100;u="ml"}else if(/^cl$/i.test(u)){n*=10;u="ml"}
+ if(/^(el|tl)$/i.test(u))u=u.toUpperCase();u=u.replace(/^stück$/i,"Stk").replace(/^(pck|päckchen)$/i,"Pck");
+ return{amount:n,unit:u,name:m[3].trim()}}
+function parseText(t){const L=t.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);if(!L.length)return null;
+ const hz=/^zutaten\b/i,hs=/^(zubereitung|anleitung|so geht|schritte|zubereiten|methode)\b/i;
+ let title="",mode="";const ing=[],st=[];
+ const sm=t.match(/(?:für|ergibt|portionen:?|personen:?)\s*(\d+)|(\d+)\s*(?:portionen|personen|pers\b)/i),sv=sm?+(sm[1]||sm[2]):4;
+ for(const l of L){
+  if(hz.test(l)){mode="i";continue}if(hs.test(l)){mode="s";continue}
+  if(!title){title=l.length<80?l:l.slice(0,60);continue}
+  if(/^(portionen|personen|für \d+)/i.test(l)&&l.length<30)continue;
+  if(mode==="i"){const x=parseIng(l);if(x)ing.push(x)}
+  else if(mode==="s")st.push(l.replace(/^(\d+[.)]|schritt\s*\d+:?)\s*/i,""));
+  else{const x=parseIng(l);if(x&&x.amount!=null&&l.length<70)ing.push(x);else if(l.length>=25)st.push(l.replace(/^\d+[.)]\s*/,""))}}
+ return{title,servings:sv||4,ingredients:ing,steps:st}}
+function ld(html){const re=/<script[^>]*ld\+json[^>]*>([\s\S]*?)<\/script>/gi;let m;
+ const find=o=>{if(!o||typeof o!=="object")return null;if(Array.isArray(o)){for(const x of o){const r=find(x);if(r)return r}return null}
+  if([].concat(o["@type"]||[]).includes("Recipe"))return o;return find(o["@graph"])};
+ while((m=re.exec(html))){try{const r=find(JSON.parse(m[1]));if(r)return r}catch(e){}}return null}
+function fromLd(r){const dec=s=>{const d=document.createElement("textarea");d.innerHTML=String(s);return d.value.replace(/<[^>]+>/g,"").trim()};
+ const steps=[],walk=x=>{if(!x)return;if(typeof x==="string")steps.push(dec(x));else if(Array.isArray(x))x.forEach(walk);else if(x.itemListElement)walk(x.itemListElement);else if(x.text)steps.push(dec(x.text))};walk(r.recipeInstructions);
+ const ym=[].concat(r.recipeYield||[]).join(" ").match(/\d+/);
+ const p={title:dec(r.name||""),servings:ym?+ym[0]:4,ingredients:[].concat(r.recipeIngredient||[]).map(x=>parseIng(dec(x))).filter(Boolean),steps:steps.filter(Boolean)};
+ p.category=guess({title:p.title+" "+[].concat(r.recipeCategory||[]).join(" "),ingredients:p.ingredients});return p}
+async function run(fn){busy="Rezept wird gelesen …";msg="";render();try{await fn()}catch(e){busy="";msg="!"+(e&&e.message||"Das hat nicht geklappt.");render()}}
+function draft(p,src){ed={_new:1,id:"r"+Date.now(),title:p.title||"",category:p.category||guess(p),servings:p.servings||4,ingredients:p.ingredients.length?p.ingredients:[{amount:"",unit:"",name:""}],steps:p.steps.length?p.steps:[""],source:src||""};V="edit";busy="";scrollTo(0,0);render()}
+async function fetchPage(u){for(const x of ["https://api.allorigins.win/raw?url=","https://corsproxy.io/?"]){try{const r=await fetch(x+encodeURIComponent(u));if(r.ok)return await r.text()}catch(e){}}throw new Error("Die Seite konnte nicht geladen werden. Füge den Rezepttext direkt ein.")}
+function goFoto(){const f=$("f").files[0];if(!f){msg="!Bitte zuerst ein Foto wählen.";return render()}
+ run(async()=>{if(!window.Tesseract)await new Promise((res,rej)=>{const e=document.createElement("script");e.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";e.onload=res;e.onerror=()=>rej(new Error("Texterkennung konnte nicht geladen werden. Bist du online?"));document.head.appendChild(e)});
+  const r=await Tesseract.recognize(await shrink(f),"deu"),p=parseText(r.data.text);
+  if(!p||!(p.ingredients.length||p.steps.length))throw new Error("Es wurde kein Rezepttext erkannt. Fotografiere die Seite gerade und gut beleuchtet.");draft(p,"")})}
+function goLink(){const u=$("u").value.trim(),t=$("t").value.trim();if(!u&&!t){msg="!Bitte Link oder Text eingeben.";return render()}
+ run(async()=>{let p=null;if(t)p=parseText(t);else{const r=ld(await fetchPage(u));if(r)p=fromLd(r)}
+  if(!p||!(p.ingredients.length||p.steps.length))throw new Error(t?"Im Text wurden keine Zutaten erkannt. Nutze Zeilen wie «Zutaten» und «Zubereitung».":"Auf dieser Seite wurde kein Rezept gefunden. Füge den Rezepttext direkt ein.");draft(p,u)})}
+function cancelEd(){const n=ed&&ed._new;ed=null;V=n?"list":"detail";render()}
+async function exp(){const name="rezeptbuch-"+new Date().toISOString().slice(0,10)+".json",f=new File([JSON.stringify(R,null,1)],name,{type:"application/json"});
+ try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});note="Gesichert."}else{const a=document.createElement("a");a.href=URL.createObjectURL(f);a.download=name;a.click();note="Datei wurde heruntergeladen."}}catch(e){note="Sichern abgebrochen."}render()}
+function imp(f){if(!f)return;const fr=new FileReader();fr.onload=()=>{try{const a=JSON.parse(fr.result);if(!Array.isArray(a))throw 0;const ids=new Set(R.map(x=>x.id));let n=0;a.forEach(r=>{if(r&&r.title&&Array.isArray(r.ingredients)&&!ids.has(r.id)){R.push({id:String(r.id||"r"+Date.now()+n),title:String(r.title),category:CATS.includes(r.category)?r.category:"Hauptgericht",servings:Math.max(1,parseInt(r.servings)||4),ingredients:r.ingredients.map(i=>({amount:typeof i.amount==="number"?i.amount:null,unit:String(i.unit||""),name:String(i.name||"")})),steps:(r.steps||[]).map(String),source:String(r.source||"")});n++}});save();note=n+" Rezepte wiederhergestellt."}catch(e){note="Datei konnte nicht gelesen werden."}render()};fr.readAsText(f)}
+function startEd(){const r=R.find(x=>x.id===cur);ed=JSON.parse(JSON.stringify(r));V="edit";scrollTo(0,0);render()}
+function saveEd(){const t=String(ed.title||"").trim();if(!t){alert("Bitte einen Titel eingeben.");return}
+ let r,old;if(ed._new){r={id:ed.id,source:ed.source||""};R.unshift(r);cur=r.id;old=-1}else{r=R.find(x=>x.id===cur);old=r.servings}r.title=t;r.category=ed.category;r.servings=Math.max(1,parseInt(ed.servings)||old);
+ r.ingredients=ed.ingredients.filter(i=>String(i.name).trim()).map(i=>{const s=String(i.amount??"").trim().replace(",","."),m=s.match(/^(?:(\d+)\s+)?(\d+)\/(\d+)$/),n=s===""?null:m?(+(m[1]||0))+m[2]/m[3]:parseFloat(s);return{amount:n==null||isNaN(n)?null:n,unit:String(i.unit||"").trim(),name:String(i.name).trim()}});
+ r.steps=ed.steps.map(s=>String(s).trim()).filter(Boolean);
+ if(r.servings!==old)pers=r.servings;save();ed=null;V="detail";render()}
+render();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
